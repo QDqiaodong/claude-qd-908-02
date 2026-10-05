@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,13 +32,16 @@ public class TurbineService {
     private final WindFarmRepository farmRepository;
     private final FarmService farmService;
     private final SafetyTicketRepository ticketRepository;
+    private final GridCommandService gridCommandService;
 
     public TurbineService(TurbineRepository turbineRepository, WindFarmRepository farmRepository,
-            FarmService farmService, SafetyTicketRepository ticketRepository) {
+            FarmService farmService, SafetyTicketRepository ticketRepository,
+            @Lazy GridCommandService gridCommandService) {
         this.turbineRepository = turbineRepository;
         this.farmRepository = farmRepository;
         this.farmService = farmService;
         this.ticketRepository = ticketRepository;
+        this.gridCommandService = gridCommandService;
     }
 
     public List<Turbine> list(Long farmId) {
@@ -179,7 +183,10 @@ public class TurbineService {
         if (!"ONLINE".equals(status)) {
             turbine.setLastPowerKw(BigDecimal.ZERO);
         }
-        return turbineRepository.save(turbine);
+        Turbine saved = turbineRepository.save(turbine);
+        gridCommandService.refreshExecutionForTurbine(saved, "值班人员",
+                "机位状态变更为「" + Dict.turbineStatusName(status) + "」，刷新限功率分摊额度");
+        return saved;
     }
 
     @Transactional

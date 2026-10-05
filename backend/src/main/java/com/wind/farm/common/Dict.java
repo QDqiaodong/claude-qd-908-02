@@ -152,6 +152,42 @@ public final class Dict {
             "PASS", "验收合格",
             "FAIL", "验收驳回");
 
+    // ---------------- 电网限功率指令 ----------------
+    /** 待执行 / 执行中 / 已暂停 / 已结束 / 已取消 */
+    public static final List<String> GRID_COMMAND_STATUSES =
+            List.of("PLANNED", "EXECUTING", "PAUSED", "FINISHED", "CANCELLED");
+
+    private static final Map<String, String> GRID_COMMAND_STATUS = Map.of(
+            "PLANNED", "待执行",
+            "EXECUTING", "执行中",
+            "PAUSED", "已暂停",
+            "FINISHED", "已结束",
+            "CANCELLED", "已取消");
+
+    public static final List<String> GRID_ALLOCATION_MODES = List.of("PROPORTIONAL", "MANUAL");
+    private static final Map<String, String> GRID_ALLOCATION_MODE = Map.of(
+            "PROPORTIONAL", "按额定容量比例分摊",
+            "MANUAL", "值班人员逐台确认");
+
+    /** 读数迟报阈值：记录时刻后 15 分钟以上才上报 */
+    public static final long GRID_LATE_REPORT_SECONDS = 15 * 60L;
+    /** 持续越限窗口：15 分钟内连续两次及以上越限 */
+    public static final long GRID_PERSIST_WINDOW_SECONDS = 15 * 60L;
+
+    private static final Map<String, String> GRID_EVENT_CLASS = Map.of(
+            "OK", "正常",
+            "LATE_ONLY", "读数迟报",
+            "SINGLE_EXCEED", "短时越限",
+            "PERSISTENT_EXCEED", "持续越限",
+            "CLEARED", "复核回落",
+            "MISSING_DATA", "读数缺失");
+
+    private static final Map<String, String> GRID_CASE_STATUS = Map.of(
+            "OPEN", "待处置",
+            "HANDLED", "已处置",
+            "REVIEWED", "已复核",
+            "RELEASED", "已解除");
+
     // ---------------- 备件分类 ----------------
     public static final List<String> PART_CATEGORIES = List.of(
             "BLADE", "GEARBOX", "GENERATOR", "PITCH", "ELECTRIC", "HYDRAULIC", "FASTENER", "LUBE");
@@ -448,6 +484,32 @@ public final class Dict {
 
     public static String partCategoryName(String category) {
         return category == null ? "" : PART_CATEGORY.getOrDefault(category, category);
+    }
+
+    // ---------------- 电网限功率指令取值 ----------------
+
+    public static boolean isValidGridCommandStatus(String status) {
+        return status != null && GRID_COMMAND_STATUS.containsKey(status);
+    }
+
+    public static String gridCommandStatusName(String status) {
+        return status == null ? "" : GRID_COMMAND_STATUS.getOrDefault(status, status);
+    }
+
+    public static boolean isValidGridAllocationMode(String mode) {
+        return mode != null && GRID_ALLOCATION_MODE.containsKey(mode);
+    }
+
+    public static String gridAllocationModeName(String mode) {
+        return mode == null ? "" : GRID_ALLOCATION_MODE.getOrDefault(mode, mode);
+    }
+
+    public static String gridEventClassName(String value) {
+        return value == null ? "" : GRID_EVENT_CLASS.getOrDefault(value, value);
+    }
+
+    public static String gridCaseStatusName(String status) {
+        return status == null ? "" : GRID_CASE_STATUS.getOrDefault(status, status);
     }
 
     /** 日发电量理论上限 = 额定功率 × 24h */

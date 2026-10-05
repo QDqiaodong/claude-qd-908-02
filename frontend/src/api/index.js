@@ -122,6 +122,29 @@ const isolation = {
   restore: (id, data) => call(http.post(`/isolation/point/${id}/restore`, data))
 }
 
+// ---------------- 电网限功率 ----------------
+const grid = {
+  commands: (farmId) => call(http.get('/grid/command/vo', { params: { farmId } })),
+  command: (id) => call(http.get(`/grid/command/${id}/vo`)),
+  create: (data) => call(http.post('/grid/command', data)),
+  update: (id, data) => call(http.put(`/grid/command/${id}`, data)),
+  remove: (id) => call(http.delete(`/grid/command/${id}`)),
+  preview: (id) => call(http.post(`/grid/command/${id}/allocation/preview`)),
+  confirm: (id, data) => call(http.post(`/grid/command/${id}/allocation/confirm`, data || {})),
+  start: (id, data) => call(http.post(`/grid/command/${id}/start`, data || {})),
+  pause: (id, data) => call(http.post(`/grid/command/${id}/pause`, data || {})),
+  resume: (id, data) => call(http.post(`/grid/command/${id}/resume`, data || {})),
+  finish: (id, data) => call(http.post(`/grid/command/${id}/finish`, data || {})),
+  cancel: (id, data) => call(http.post(`/grid/command/${id}/cancel`, data || {})),
+  sync: (farmId) => call(http.post(`/grid/farm/${farmId}/sync`)),
+  events: (farmId) => call(http.get('/grid/event/vo', { params: { farmId } })),
+  cases: (farmId) => call(http.get('/grid/case/vo', { params: { farmId } })),
+  case: (id) => call(http.get(`/grid/case/${id}/vo`)),
+  handle: (id, data) => call(http.post(`/grid/case/${id}/handle`, data)),
+  review: (id, data) => call(http.post(`/grid/case/${id}/review`, data)),
+  release: (id, data) => call(http.post(`/grid/case/${id}/release`, data))
+}
+
 // ---------------- 发电统计 ----------------
 const stats = {
   overview: () => call(http.get('/stats/overview')),
@@ -135,4 +158,4 @@ const stats = {
   dict: () => call(http.get('/stats/dict'))
 }
 
-export default { http, farm, turbine, runlog, workorder, part, stats, isolation }
+export default { http, farm, turbine, runlog, workorder, part, stats, isolation, grid }

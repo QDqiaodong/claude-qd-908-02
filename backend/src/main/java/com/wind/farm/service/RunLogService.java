@@ -18,6 +18,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,13 +38,16 @@ public class RunLogService {
     private final TurbineRepository turbineRepository;
     private final WindFarmRepository farmRepository;
     private final SafetyTicketRepository ticketRepository;
+    private final GridLimitService gridLimitService;
 
     public RunLogService(RunLogRepository runLogRepository, TurbineRepository turbineRepository,
-            WindFarmRepository farmRepository, SafetyTicketRepository ticketRepository) {
+            WindFarmRepository farmRepository, SafetyTicketRepository ticketRepository,
+            @Lazy GridLimitService gridLimitService) {
         this.runLogRepository = runLogRepository;
         this.turbineRepository = turbineRepository;
         this.farmRepository = farmRepository;
         this.ticketRepository = ticketRepository;
+        this.gridLimitService = gridLimitService;
     }
 
     public List<RunLog> list(Long turbineId, Long farmId) {
@@ -168,6 +172,7 @@ public class RunLogService {
         turbine.setTodayEnergyKwh(dailyEnergy);
         turbine.setTotalEnergyKwh(nullSafe(turbine.getTotalEnergyKwh()).add(dailyEnergy));
         turbineRepository.save(turbine);
+        gridLimitService.evaluateLog(saved, "READING", request.getOperator());
         return saved;
     }
 
@@ -225,12 +230,19 @@ public class RunLogService {
         ifNotNull(request.getTemperatureC(), log::setTemperatureC);
         ifNotNull(request.getOperator(), log::setOperator);
         ifNotNull(request.getNote(), log::setNote);
-        return runLogRepository.save(log);
+        RunLog saved = runLogRepository.save(log);
+        String trigger = request.getActivePowerKw() != null || request.getRecordTime() != null
+                || request.getReportTime() != null
+                ? "CORRECTION" : "MANUAL_RECHECK";
+        gridLimitService.evaluateLog(saved, trigger, request.getOperator());
+        return saved;
     }
 
     @Transactional
     public void remove(Long id) {
-        runLogRepository.delete(get(id));
+        RunLog log = get(id);
+        gridLimitService.onLogDeleted(log, null);
+        runLogRepository.delete(log);
     }
 
     public RunLogVO toVO(RunLog log) {

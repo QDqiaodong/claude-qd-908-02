@@ -5,6 +5,7 @@ import api from './api'
 
 import TurbineView from './views/TurbineView.vue'
 import RunLogView from './views/RunLogView.vue'
+import GridView from './views/GridView.vue'
 import WorkOrderView from './views/WorkOrderView.vue'
 import SparePartView from './views/SparePartView.vue'
 import StatsView from './views/StatsView.vue'
@@ -15,6 +16,7 @@ import StatsView from './views/StatsView.vue'
 const viewMap = {
   '/turbine': TurbineView,
   '/run': RunLogView,
+  '/grid': GridView,
   '/maint': WorkOrderView,
   '/part': SparePartView,
   '/stats': StatsView
@@ -71,8 +73,9 @@ onMounted(async () => {
       <div class="brand-mark" @click="home" style="cursor: pointer"><span>风</span></div>
       <div>
         <div class="brand-title">陆上风电场 · 风机与检修发电管理</div>
-        <div class="brand-sub">风场 → 机位 → 运行日志 → 检修工单 → 备件更换 → 发电统计</div>
+        <div class="brand-sub">风场 → 机位 → 运行日志 → 电网限功率 → 检修工单 → 备件更换 → 发电统计</div>
       </div>
+      <el-button size="small" type="danger" plain @click="router.push('/grid')">电网限功率</el-button>
       <el-button size="small" type="primary" plain @click="router.push('/part')">备件与更换</el-button>
 
       <!-- 顶部唯一的一条导航：风场切换器 -->

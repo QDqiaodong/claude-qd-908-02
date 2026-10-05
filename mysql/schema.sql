@@ -22,6 +22,12 @@ DROP TABLE IF EXISTS part_replacement;
 DROP TABLE IF EXISTS spare_part;
 DROP TABLE IF EXISTS work_item;
 DROP TABLE IF EXISTS work_order;
+DROP TABLE IF EXISTS grid_case_log;
+DROP TABLE IF EXISTS grid_limit_case;
+DROP TABLE IF EXISTS grid_limit_event;
+DROP TABLE IF EXISTS grid_command_log;
+DROP TABLE IF EXISTS grid_power_allocation;
+DROP TABLE IF EXISTS grid_power_command;
 DROP TABLE IF EXISTS run_log;
 DROP TABLE IF EXISTS turbine;
 DROP TABLE IF EXISTS wind_farm;
@@ -92,6 +98,186 @@ CREATE TABLE run_log (
     note VARCHAR(128),
     KEY idx_runlog_turbine (turbine_id),
     KEY idx_runlog_farm (farm_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------- 电网限功率指令 ----------------
+-- 状态：PLANNED 待执行 / EXECUTING 执行中 / PAUSED 已暂停 / FINISHED 已结束 / CANCELLED 已取消。
+-- start_time/end_time 存绝对时刻并保留风场 ZoneId；跨本地日期、夏令时或时区调整时按 Instant 比较，不按本地日期字符串拼接。
+-- overlap_policy 目前只允许 STRICT_MIN：多条有效指令重叠时逐机位取最严（最小）上限，宽松指令不会解除严格旧指令。
+CREATE TABLE grid_power_command (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    command_no VARCHAR(48) NOT NULL UNIQUE,
+    farm_id BIGINT NOT NULL,
+    target_limit_kw DECIMAL(10,2) NOT NULL,
+    allocation_mode VARCHAR(24) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'PLANNED',
+    active_slot BIGINT DEFAULT 1,
+    priority_rank INT NOT NULL DEFAULT 100,
+    overlap_policy VARCHAR(24) NOT NULL DEFAULT 'STRICT_MIN',
+    start_time DATETIME NOT NULL,
+    start_time_tz VARCHAR(32),
+    end_time DATETIME NOT NULL,
+    end_time_tz VARCHAR(32),
+    release_condition VARCHAR(256),
+    allocation_status VARCHAR(24) DEFAULT 'NOT_CONFIRMED',
+    activated_time DATETIME,
+    activated_time_tz VARCHAR(32),
+    paused_time DATETIME,
+    paused_time_tz VARCHAR(32),
+    finished_time DATETIME,
+    finished_time_tz VARCHAR(32),
+    cancelled_time DATETIME,
+    cancelled_time_tz VARCHAR(32),
+    owner VARCHAR(32),
+    note VARCHAR(256),
+    lock_version INT DEFAULT 0,
+    created_at DATETIME,
+    updated_at DATETIME,
+    KEY idx_grid_cmd_farm (farm_id),
+    KEY idx_grid_cmd_status_time (status, start_time, end_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------- 限功率指令机位分摊 ----------------
+-- allocated_limit_kw 是启动前确认的快照；current_limit_kw 是执行期随停运/检修释放并重算后的有效额度。
+-- PROPORTIONAL 由后台按当前可运行机位额定容量比例分摊；MANUAL 必须由值班人员逐台确认。
+-- EXCLUDED 行表示适用但当时不可运行的机位，current_limit_kw=0，不占用场站额度。
+CREATE TABLE grid_power_allocation (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    command_id BIGINT NOT NULL,
+    farm_id BIGINT NOT NULL,
+    turbine_id BIGINT NOT NULL,
+    unit_code VARCHAR(32),
+    rated_power_kw DECIMAL(10,2) NOT NULL,
+    included_flag TINYINT(1) NOT NULL DEFAULT 1,
+    runnable_flag TINYINT(1) NOT NULL DEFAULT 1,
+    allocation_mode VARCHAR(24) NOT NULL,
+    allocated_limit_kw DECIMAL(10,2),
+    current_limit_kw DECIMAL(10,2),
+    manual_confirmed TINYINT(1) NOT NULL DEFAULT 0,
+    status VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    reason VARCHAR(256),
+    allocated_time DATETIME,
+    allocated_time_tz VARCHAR(32),
+    lock_version INT DEFAULT 0,
+    UNIQUE KEY uk_grid_alloc_cmd_turbine (command_id, turbine_id),
+    KEY idx_grid_alloc_command (command_id),
+    KEY idx_grid_alloc_turbine (turbine_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------- 电网限功率指令操作轨迹 ----------------
+CREATE TABLE grid_command_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    command_id BIGINT NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    from_status VARCHAR(16),
+    to_status VARCHAR(16),
+    operator VARCHAR(32),
+    detail VARCHAR(1024),
+    created_at DATETIME,
+    created_at_tz VARCHAR(32),
+    KEY idx_grid_cmd_log_command (command_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------- 限值判定事件（读数修正只追加版本，不覆盖原判断） ----------------
+-- scope=TURBINE 时按机位分摊上限判断；scope=FARM 时按本指令适用机位合计与场站/子集目标判断。
+-- classification：LATE_ONLY 读数迟报 / SINGLE_EXCEED 短时越限 / PERSISTENT_EXCEED 持续越限 / CLEARED 复核已回落 / OK。
+-- 旧事件被新读数或补录修正触发重算时置 SUPERSEDED，但原记录、原越限量和原处置依据仍保留。
+CREATE TABLE grid_limit_event (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    farm_id BIGINT NOT NULL,
+    command_id BIGINT NOT NULL,
+    command_no VARCHAR(32),
+    scope VARCHAR(16) NOT NULL,
+    turbine_id BIGINT,
+    unit_code VARCHAR(32),
+    run_log_id BIGINT,
+    event_key VARCHAR(96),
+    observed_time DATETIME NOT NULL,
+    observed_time_tz VARCHAR(32),
+    report_time DATETIME,
+    report_time_tz VARCHAR(32),
+    evaluated_time DATETIME NOT NULL,
+    evaluated_time_tz VARCHAR(32),
+    report_delay_seconds BIGINT DEFAULT 0,
+    late_flag TINYINT(1) DEFAULT 0,
+    active_power_kw DECIMAL(10,2),
+    limit_kw DECIMAL(10,2),
+    total_power_kw DECIMAL(10,2),
+    total_limit_kw DECIMAL(10,2),
+    overage_kw DECIMAL(10,2) DEFAULT 0,
+    consecutive_count INT DEFAULT 1,
+    classification VARCHAR(24) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'OPEN',
+    trigger VARCHAR(24),
+    revision_no INT DEFAULT 1,
+    supersedes_event_id BIGINT,
+    superseded_by_event_id BIGINT,
+    case_id BIGINT,
+    operator VARCHAR(32),
+    note VARCHAR(512),
+    created_at DATETIME,
+    KEY idx_grid_event_farm (farm_id),
+    KEY idx_grid_event_command (command_id),
+    KEY idx_grid_event_turbine_time (turbine_id, observed_time),
+    KEY idx_grid_event_log (run_log_id),
+    KEY idx_grid_event_case (case_id),
+    KEY idx_grid_event_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------- 限值偏差处置 / 复核 / 解除 ----------------
+CREATE TABLE grid_limit_case (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    farm_id BIGINT NOT NULL,
+    command_id BIGINT NOT NULL,
+    initial_event_id BIGINT NOT NULL,
+    latest_event_id BIGINT NOT NULL,
+    scope VARCHAR(16) NOT NULL,
+    turbine_id BIGINT,
+    unit_code VARCHAR(32),
+    run_log_id BIGINT,
+    classification VARCHAR(24) NOT NULL,
+    status VARCHAR(16) NOT NULL,
+    observed_time DATETIME,
+    observed_time_tz VARCHAR(32),
+    active_power_kw DECIMAL(10,2),
+    limit_kw DECIMAL(10,2),
+    total_power_kw DECIMAL(10,2),
+    total_limit_kw DECIMAL(10,2),
+    overage_kw DECIMAL(10,2),
+    handle_action VARCHAR(256),
+    handle_operator VARCHAR(32),
+    handled_time DATETIME,
+    handled_time_tz VARCHAR(32),
+    handle_note VARCHAR(512),
+    review_result VARCHAR(24),
+    review_operator VARCHAR(32),
+    reviewed_time DATETIME,
+    reviewed_time_tz VARCHAR(32),
+    review_note VARCHAR(512),
+    release_result VARCHAR(24),
+    release_operator VARCHAR(32),
+    released_time DATETIME,
+    released_time_tz VARCHAR(32),
+    release_note VARCHAR(512),
+    lock_version INT DEFAULT 0,
+    created_at DATETIME,
+    updated_at DATETIME,
+    KEY idx_grid_case_farm (farm_id),
+    KEY idx_grid_case_command (command_id),
+    KEY idx_grid_case_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------- 偏差处置流水 ----------------
+CREATE TABLE grid_case_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    case_id BIGINT NOT NULL,
+    event_id BIGINT,
+    action VARCHAR(32) NOT NULL,
+    operator VARCHAR(32),
+    detail VARCHAR(1024),
+    created_at DATETIME,
+    created_at_tz VARCHAR(32),
+    KEY idx_grid_case_log_case (case_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------- 检修工单 ----------------
