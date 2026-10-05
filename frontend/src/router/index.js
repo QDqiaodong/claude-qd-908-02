@@ -7,11 +7,13 @@ import RunLogView from '../views/RunLogView.vue'
 import WorkOrderView from '../views/WorkOrderView.vue'
 import SparePartView from '../views/SparePartView.vue'
 import StatsView from '../views/StatsView.vue'
+import GridLimitView from '../views/GridLimitView.vue'
 
 const routes = [
   { path: '/', redirect: '/turbine' },
   { path: '/turbine', name: 'turbine', component: TurbineView },
   { path: '/run', name: 'run', component: RunLogView },
+  { path: '/grid', name: 'grid', component: GridLimitView },
   { path: '/maint', name: 'maint', component: WorkOrderView },
   { path: '/part', name: 'part', component: SparePartView },
   { path: '/stats', name: 'stats', component: StatsView },

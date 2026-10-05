@@ -37,13 +37,16 @@ public class RunLogService {
     private final TurbineRepository turbineRepository;
     private final WindFarmRepository farmRepository;
     private final SafetyTicketRepository ticketRepository;
+    private final GridLimitService gridLimitService;
 
     public RunLogService(RunLogRepository runLogRepository, TurbineRepository turbineRepository,
-            WindFarmRepository farmRepository, SafetyTicketRepository ticketRepository) {
+            WindFarmRepository farmRepository, SafetyTicketRepository ticketRepository,
+            GridLimitService gridLimitService) {
         this.runLogRepository = runLogRepository;
         this.turbineRepository = turbineRepository;
         this.farmRepository = farmRepository;
         this.ticketRepository = ticketRepository;
+        this.gridLimitService = gridLimitService;
     }
 
     public List<RunLog> list(Long turbineId, Long farmId) {
@@ -75,7 +78,7 @@ public class RunLogService {
         }
         Turbine turbine = turbineRepository.findById(request.getTurbineId())
                 .orElseThrow(() -> new BizException("机位不存在：" + request.getTurbineId()));
-        WindFarm farm = farmRepository.findById(turbine.getFarmId()).orElse(null);
+        WindFarm farm = farmRepository.lockById(turbine.getFarmId()).orElse(null);
         String zone = farm == null ? null : farm.getTimeZone();
 
         // 规则：故障机位不允许登记发电读数
@@ -168,14 +171,16 @@ public class RunLogService {
         turbine.setTodayEnergyKwh(dailyEnergy);
         turbine.setTotalEnergyKwh(nullSafe(turbine.getTotalEnergyKwh()).add(dailyEnergy));
         turbineRepository.save(turbine);
+        gridLimitService.evaluateFarmAtTime(turbine.getFarmId(), saved.getRecordTime(), "读数登记");
         return saved;
     }
 
     @Transactional
     public RunLog update(Long id, RunLogRequest request) {
         RunLog log = get(id);
+        ZonedDateTime oldRecordTime = log.getRecordTime();
         Turbine turbine = turbineRepository.findById(log.getTurbineId()).orElse(null);
-        WindFarm farm = turbine == null ? null : farmRepository.findById(turbine.getFarmId()).orElse(null);
+        WindFarm farm = turbine == null ? null : farmRepository.lockById(turbine.getFarmId()).orElse(null);
         String zone = farm == null ? null : farm.getTimeZone();
 
         if (request.getRecordTime() != null) {
@@ -225,12 +230,24 @@ public class RunLogService {
         ifNotNull(request.getTemperatureC(), log::setTemperatureC);
         ifNotNull(request.getOperator(), log::setOperator);
         ifNotNull(request.getNote(), log::setNote);
-        return runLogRepository.save(log);
+        RunLog saved = runLogRepository.save(log);
+        // 读数补录 / 修正后重新计算；原偏差版本保留，不抹掉原判断。
+        ZonedDateTime evalTime = saved.getRecordTime();
+        if (oldRecordTime != null && saved.getRecordTime() != null && !oldRecordTime.isEqual(saved.getRecordTime())) {
+            gridLimitService.recalculateFarmAtTime(log.getFarmId(), oldRecordTime, "读数记录时刻已修改");
+        }
+        gridLimitService.recalculateFarmAtTime(log.getFarmId(), evalTime, "读数补录 / 修正");
+        return saved;
     }
 
     @Transactional
     public void remove(Long id) {
-        runLogRepository.delete(get(id));
+        RunLog log = get(id);
+        WindFarm farm = farmRepository.lockById(log.getFarmId()).orElse(null);
+        runLogRepository.delete(log);
+        if (log.getFarmId() != null && log.getRecordTime() != null) {
+            gridLimitService.recalculateFarmAtTime(log.getFarmId(), log.getRecordTime(), "读数删除后重算");
+        }
     }
 
     public RunLogVO toVO(RunLog log) {
@@ -252,6 +269,14 @@ public class RunLogService {
         vo.setReportLocal(TimeText.local(log.getReportTime(), TimeText.pickZone(log.getReportZone(), zone)));
         vo.setWindSpeedMs(log.getWindSpeedMs());
         vo.setActivePowerKw(log.getActivePowerKw());
+        com.wind.farm.service.GridLimitService.EffectiveLimit limit =
+                gridLimitService.effectiveTurbineLimitAt(log.getFarmId(), log.getTurbineId(), log.getRecordTime());
+        if (limit != null) {
+            vo.setGridLimitKw(limit.limitKw());
+            vo.setGridOrderNo(limit.order().getOrderNo());
+            vo.setGridExceeded(log.getActivePowerKw() != null && log.getActivePowerKw()
+                    .compareTo(limit.limitKw().add(Dict.gridTolerance(limit.limitKw()))) > 0);
+        }
         vo.setDailyEnergyKwh(log.getDailyEnergyKwh());
         vo.setWindDirection(log.getWindDirection());
         vo.setTemperatureC(log.getTemperatureC());

@@ -259,6 +259,14 @@ watch(turbineId, () => {
         <el-table-column prop="reportLocal" label="上报时刻" width="150" />
         <el-table-column prop="windSpeedMs" label="风速" width="80" />
         <el-table-column prop="activePowerKw" label="有功 kW" width="100" />
+        <el-table-column label="限功率" width="170">
+          <template #default="{ row }">
+            <el-tag v-if="row.gridLimitKw" size="small" :type="row.gridExceeded ? 'danger' : 'success'">
+              {{ row.gridOrderNo }}：{{ row.gridLimitKw }} kW
+            </el-tag>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="dailyEnergyKwh" label="日发电 kWh" width="120" />
         <el-table-column label="负荷率" width="100">
           <template #default="{ row }">{{ Math.round((row.loadRate || 0) * 100) }}%</template>

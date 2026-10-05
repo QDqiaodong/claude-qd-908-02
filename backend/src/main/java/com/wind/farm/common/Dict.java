@@ -134,6 +134,118 @@ public final class Dict {
             "RESTORING", List.of("RESTORED"),
             "RESTORED", List.of());
 
+    // ---------------- 电网限功率指令 ----------------
+    public static final List<String> GRID_ORDER_STATUSES =
+            List.of("PLANNED", "EXECUTING", "PAUSED", "ENDED", "CANCELLED");
+    private static final Map<String, String> GRID_ORDER_STATUS = Map.of(
+            "PLANNED", "待执行",
+            "EXECUTING", "执行中",
+            "PAUSED", "已暂停",
+            "ENDED", "已结束",
+            "CANCELLED", "已取消");
+    private static final Map<String, String> GRID_ORDER_COLOR = Map.of(
+            "PLANNED", "#2f80c2",
+            "EXECUTING", "#e2483d",
+            "PAUSED", "#f08c00",
+            "ENDED", "#2e9e5b",
+            "CANCELLED", "#8b95a5");
+
+    public static final String GRID_SCOPE_FULL = "FULL";
+    public static final String GRID_SCOPE_PART = "PART";
+    private static final Map<String, String> GRID_SCOPE = Map.of(
+            GRID_SCOPE_FULL, "全场站",
+            GRID_SCOPE_PART, "指定机位");
+
+    public static final String GRID_ALLOC_PROPORTIONAL = "PROPORTIONAL";
+    public static final String GRID_ALLOC_MANUAL = "MANUAL";
+    private static final Map<String, String> GRID_ALLOC_MODE = Map.of(
+            GRID_ALLOC_PROPORTIONAL, "按额定容量比例分摊",
+            GRID_ALLOC_MANUAL, "值班人员逐台确认");
+
+    public static final String GRID_OVERLAP_COEXIST = "COEXIST";
+    public static final String GRID_OVERLAP_SUPERSEDE = "SUPERSEDE";
+    private static final Map<String, String> GRID_OVERLAP_MODE = Map.of(
+            GRID_OVERLAP_COEXIST, "并行取严",
+            GRID_OVERLAP_SUPERSEDE, "显式替代");
+
+    public static final String GRID_DEVIATION_LATE = "LATE_REPORT";
+    public static final String GRID_DEVIATION_FLUCTUATION = "FLUCTUATION";
+    public static final String GRID_DEVIATION_PERSISTENT = "PERSISTENT";
+    private static final Map<String, String> GRID_DEVIATION_TYPE = Map.of(
+            GRID_DEVIATION_LATE, "读数迟报",
+            GRID_DEVIATION_FLUCTUATION, "短时波动",
+            GRID_DEVIATION_PERSISTENT, "持续执行偏差");
+    private static final Map<String, String> GRID_DEVIATION_STATUS = Map.of(
+            "OPEN", "待处置",
+            "HANDLED", "已处置",
+            "REVIEWED", "已复核",
+            "RELEASED", "已解除",
+            "SUPERSEDED", "已重算");
+
+    /** 读数迟报阈值：上报时刻晚于记录时刻超过 15 分钟。 */
+    public static final int GRID_LATE_REPORT_MINUTES = 15;
+    /** 持续偏差判定：相邻两条超限读数间隔不超过 60 分钟（覆盖常规 5 分钟 / 15 分钟 / 1 小时抄表周期）。 */
+    public static final int GRID_PERSISTENT_GAP_MINUTES = 60;
+    /** 限值容差：2%，单机最多 50kW，避免量测小波动直接定性为执行偏差。 */
+    public static final BigDecimal GRID_TOLERANCE_RATE = BigDecimal.valueOf(0.02);
+    public static final BigDecimal GRID_MAX_TOLERANCE_KW = BigDecimal.valueOf(50);
+
+    public static boolean isValidGridOrderStatus(String status) {
+        return status != null && GRID_ORDER_STATUS.containsKey(status);
+    }
+
+    public static String gridOrderStatusName(String status) {
+        return status == null ? "" : GRID_ORDER_STATUS.getOrDefault(status, status);
+    }
+
+    public static String gridOrderStatusColor(String status) {
+        return status == null ? "#8b95a5" : GRID_ORDER_COLOR.getOrDefault(status, "#8b95a5");
+    }
+
+    public static boolean isValidGridScope(String scope) {
+        return scope != null && GRID_SCOPE.containsKey(scope);
+    }
+
+    public static String gridScopeName(String scope) {
+        return scope == null ? "" : GRID_SCOPE.getOrDefault(scope, scope);
+    }
+
+    public static boolean isValidGridAllocationMode(String mode) {
+        return mode != null && GRID_ALLOC_MODE.containsKey(mode);
+    }
+
+    public static String gridAllocationModeName(String mode) {
+        return mode == null ? "" : GRID_ALLOC_MODE.getOrDefault(mode, mode);
+    }
+
+    public static boolean isValidGridOverlapMode(String mode) {
+        return mode != null && GRID_OVERLAP_MODE.containsKey(mode);
+    }
+
+    public static String gridOverlapModeName(String mode) {
+        return mode == null ? "" : GRID_OVERLAP_MODE.getOrDefault(mode, mode);
+    }
+
+    public static String gridDeviationTypeName(String type) {
+        return type == null ? "" : GRID_DEVIATION_TYPE.getOrDefault(type, type);
+    }
+
+    public static String gridDeviationStatusName(String status) {
+        return status == null ? "" : GRID_DEVIATION_STATUS.getOrDefault(status, status);
+    }
+
+    /** 判断机位是否可参与限功率分摊；只有当前并网机位占用目标额度。 */
+    public static boolean isGridRunnableTurbine(String status) {
+        return "ONLINE".equals(status);
+    }
+
+    public static BigDecimal gridTolerance(BigDecimal limitKw) {
+        if (limitKw == null || limitKw.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return limitKw.multiply(GRID_TOLERANCE_RATE).min(GRID_MAX_TOLERANCE_KW);
+    }
+
     // ---------------- 隔离点手段 ----------------
     public static final List<String> ISOLATION_TYPES =
             List.of("SHUTDOWN", "POWER_OFF", "VOLTAGE_TEST", "LOCK_OUT", "MECH_LOCK");

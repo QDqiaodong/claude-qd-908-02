@@ -92,11 +92,175 @@ public class Views {
         private BigDecimal windSpeedMs;
         private BigDecimal activePowerKw;
         private BigDecimal dailyEnergyKwh;
+        /** 读数时刻该机位在所有执行中指令下的最严格上限及容差；无指令为 null */
+        private BigDecimal gridLimitKw;
+        private String gridOrderNo;
+        private Boolean gridExceeded;
         private Double loadRate;
         private String windDirection;
         private BigDecimal temperatureC;
         private String operator;
         private String note;
+    }
+
+    /** 电网限功率指令 */
+    @Data
+    public static class GridLimitOrderVO {
+        private Long id;
+        private String orderNo;
+        private Long farmId;
+        private String farmName;
+        private String timeZone;
+        private BigDecimal targetLimitKw;
+        private String targetScope;
+        private String targetScopeName;
+        private String allocationMode;
+        private String allocationModeName;
+        private Integer priority;
+        private String overlapMode;
+        private String overlapModeName;
+        private String startTime;
+        private String startTz;
+        private String startLocal;
+        private String endTime;
+        private String endTz;
+        private String endLocal;
+        private String releaseCondition;
+        private String status;
+        private String statusName;
+        private String statusColor;
+        private String dutyOperator;
+        private String confirmedBy;
+        private String activatedLocal;
+        private String pausedLocal;
+        private String resumedLocal;
+        private String endedLocal;
+        private String cancelledLocal;
+        private String releaseResult;
+        private String releaseOperator;
+        private Long supersedesOrderId;
+        private String supersedesOrderNo;
+        private String note;
+        private List<Long> turbineIds = new ArrayList<>();
+        private String turbineText;
+        private List<GridLimitAllocationVO> allocations = new ArrayList<>();
+        private List<GridLimitLogVO> logs = new ArrayList<>();
+        private List<GridLimitOverlapVO> overlaps = new ArrayList<>();
+        private BigDecimal runnableCapacityKw;
+        private BigDecimal allocatedTotalKw;
+        private Integer runnableCount;
+        private Integer excludedCount;
+        private Boolean allocationWithinTarget;
+        private List<String> blockers = new ArrayList<>();
+    }
+
+    @Data
+    public static class GridLimitAllocationVO {
+        private Long id;
+        private Long orderId;
+        private Long turbineId;
+        private String unitCode;
+        private String unitName;
+        private String model;
+        private BigDecimal ratedPowerKw;
+        private BigDecimal limitKw;
+        private Boolean runnable;
+        private String turbineStatus;
+        private String turbineStatusName;
+        private String allocationState;
+        private String allocationStateName;
+        private String confirmOperator;
+        private String confirmedLocal;
+        private String note;
+        private BigDecimal latestPowerKw;
+        private Boolean latestExceeded;
+    }
+
+    @Data
+    public static class GridLimitLogVO {
+        private Long id;
+        private Long orderId;
+        private String action;
+        private String actionName;
+        private String fromStatus;
+        private String fromStatusName;
+        private String toStatus;
+        private String toStatusName;
+        private String operator;
+        private String detail;
+        private String createdAt;
+        private String createdTz;
+        private String createdLocal;
+    }
+
+    @Data
+    public static class GridLimitOverlapVO {
+        private Long orderId;
+        private String orderNo;
+        private String status;
+        private String statusName;
+        private Integer priority;
+        private BigDecimal otherTargetKw;
+        private String relation;
+        private String relationName;
+        private String coverage;
+        private String effect;
+    }
+
+    @Data
+    public static class GridLimitPreviewVO {
+        private Long farmId;
+        private BigDecimal targetLimitKw;
+        private BigDecimal runnableCapacityKw;
+        private BigDecimal allocatedTotalKw;
+        private Boolean withinTarget;
+        private List<GridLimitAllocationVO> allocations = new ArrayList<>();
+        private List<String> blockers = new ArrayList<>();
+    }
+
+    @Data
+    public static class GridLimitDeviationVO {
+        private Long id;
+        private Long farmId;
+        private String farmName;
+        private Long governingOrderId;
+        private String orderNo;
+        private Long runLogId;
+        private Long turbineId;
+        private String unitCode;
+        private String scope;
+        private String scopeName;
+        private String recordTime;
+        private String recordTz;
+        private String recordLocal;
+        private String reportTime;
+        private String reportTz;
+        private String reportLocal;
+        private BigDecimal actualKw;
+        private BigDecimal limitKw;
+        private BigDecimal exceededKw;
+        private String deviationType;
+        private String deviationTypeName;
+        private String status;
+        private String statusName;
+        private Integer revisionNo;
+        private Boolean latestFlag;
+        private Long supersedesDeviationId;
+        private String revisionReason;
+        private String originalDeviationType;
+        private String originalDeviationTypeName;
+        private BigDecimal originalActualKw;
+        private BigDecimal originalLimitKw;
+        private String handleNote;
+        private String reviewNote;
+        private String releaseNote;
+        private String handler;
+        private String reviewer;
+        private String releaser;
+        private String handledLocal;
+        private String reviewedLocal;
+        private String releasedLocal;
+        private String createdAt;
     }
 
     /** 检修工单（带作业项清单与进度） */

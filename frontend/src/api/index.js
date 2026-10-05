@@ -122,6 +122,28 @@ const isolation = {
   restore: (id, data) => call(http.post(`/isolation/point/${id}/restore`, data))
 }
 
+// ---------------- 电网限功率 ----------------
+const gridLimit = {
+  orders: (farmId) => call(http.get('/grid-limit/order/vo', { params: { farmId } })),
+  order: (id) => call(http.get(`/grid-limit/order/${id}`)),
+  create: (data) => call(http.post('/grid-limit/order', data)),
+  update: (id, data) => call(http.put(`/grid-limit/order/${id}`, data)),
+  preview: (id, data) => call(http.post(`/grid-limit/order/${id}/preview`, data || {})),
+  allocate: (id, data) => call(http.post(`/grid-limit/order/${id}/allocation`, data)),
+  start: (id, data) => call(http.post(`/grid-limit/order/${id}/start`, data)),
+  pause: (id, data) => call(http.post(`/grid-limit/order/${id}/pause`, data)),
+  resume: (id, data) => call(http.post(`/grid-limit/order/${id}/resume`, data)),
+  end: (id, data) => call(http.post(`/grid-limit/order/${id}/end`, data)),
+  cancel: (id, data) => call(http.post(`/grid-limit/order/${id}/cancel`, data)),
+  reallocate: (id, data) => call(http.post(`/grid-limit/order/${id}/reallocate`, data)),
+  deviations: (farmId, orderId, openOnly) => call(http.get('/grid-limit/deviation/vo', {
+    params: { farmId, orderId, openOnly }
+  })),
+  handle: (id, data) => call(http.post(`/grid-limit/deviation/${id}/handle`, data)),
+  review: (id, data) => call(http.post(`/grid-limit/deviation/${id}/review`, data)),
+  release: (id, data) => call(http.post(`/grid-limit/deviation/${id}/release`, data))
+}
+
 // ---------------- 发电统计 ----------------
 const stats = {
   overview: () => call(http.get('/stats/overview')),
@@ -135,4 +157,4 @@ const stats = {
   dict: () => call(http.get('/stats/dict'))
 }
 
-export default { http, farm, turbine, runlog, workorder, part, stats, isolation }
+export default { http, farm, turbine, runlog, workorder, part, stats, isolation, gridLimit }

@@ -8,6 +8,7 @@ import RunLogView from './views/RunLogView.vue'
 import WorkOrderView from './views/WorkOrderView.vue'
 import SparePartView from './views/SparePartView.vue'
 import StatsView from './views/StatsView.vue'
+import GridLimitView from './views/GridLimitView.vue'
 
 // 这个仓没有左侧栏、没有顶部菜单栏：
 // 顶部只有一条「风场切换器」，主区是该风场下所有机位的大卡片网格，卡片本身就是导航。
@@ -15,6 +16,7 @@ import StatsView from './views/StatsView.vue'
 const viewMap = {
   '/turbine': TurbineView,
   '/run': RunLogView,
+  '/grid': GridLimitView,
   '/maint': WorkOrderView,
   '/part': SparePartView,
   '/stats': StatsView
@@ -73,6 +75,7 @@ onMounted(async () => {
         <div class="brand-title">陆上风电场 · 风机与检修发电管理</div>
         <div class="brand-sub">风场 → 机位 → 运行日志 → 检修工单 → 备件更换 → 发电统计</div>
       </div>
+      <el-button size="small" type="danger" plain @click="router.push('/grid')">电网限功率</el-button>
       <el-button size="small" type="primary" plain @click="router.push('/part')">备件与更换</el-button>
 
       <!-- 顶部唯一的一条导航：风场切换器 -->
